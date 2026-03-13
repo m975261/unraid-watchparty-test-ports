@@ -1,0 +1,91 @@
+services:
+  watchparty-test-ports:
+    image: muaeabudhabi/watchparty-test-ports:latest
+    restart: unless-stopped
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
+      org.titan.app: watchparty-test-ports
+    environment:
+    - NODE_ENV=production
+    - LOG_LEVEL=info
+    - PUID=99
+    - PGID=100
+    - UMASK=022
+    - DATABASE_URL=postgresql://watchparty-test-ports:changeme@watchparty-test-ports_postgres:5432/watchparty-test-ports
+    - REDIS_URL=redis://watchparty-test-ports_redis:6379
+    volumes:
+    - /mnt/user/appdata/watchparty-test-ports/data:/data
+    - /mnt/user/appdata/watchparty-test-ports/config:/config
+    logging:
+      driver: json-file
+      options: &id001
+        max-size: 10m
+        max-file: '3'
+    ports:
+    - 3100:3100
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -sf http://localhost:3100/health || curl -sf http://localhost:3100/healthz
+        || curl -sf http://localhost:3100/ || exit 1
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    networks:
+    - watchparty-test-ports_net
+    depends_on:
+      watchparty-test-ports_postgres:
+        condition: service_healthy
+      watchparty-test-ports_redis:
+        condition: service_healthy
+  watchparty-test-ports_postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+    - POSTGRES_DB=watchparty-test-ports
+    - POSTGRES_USER=watchparty-test-ports
+    - POSTGRES_PASSWORD=changeme
+    volumes:
+    - watchparty-test-ports_postgres_data:/var/lib/postgresql/data
+    networks:
+    - watchparty-test-ports_net
+    logging:
+      driver: json-file
+      options: *id001
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U ${POSTGRES_USER:-app}
+      interval: 30s
+      timeout: 5s
+      retries: 5
+  watchparty-test-ports_redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    environment: []
+    volumes:
+    - watchparty-test-ports_redis_data:/data
+    networks:
+    - watchparty-test-ports_net
+    logging:
+      driver: json-file
+      options: *id001
+    healthcheck:
+      test:
+      - CMD
+      - redis-cli
+      - ping
+      interval: 30s
+      timeout: 5s
+      retries: 5
+networks:
+  watchparty-test-ports_net:
+    driver: bridge
+volumes:
+  watchparty-test-ports_data:
+    driver: local
+  watchparty-test-ports_postgres_data:
+    driver: local
+  watchparty-test-ports_redis_data:
+    driver: local
